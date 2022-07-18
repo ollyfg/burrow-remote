@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Burrow Remote</title>
+    <link rel="shortcut icon" type="image/png" href="assets/burrow.png"/>
+    <style>
+      body {
+        --dark: rgb(39, 42, 56);
+        --light: rgb(255, 255, 255);
+        --green: rgb(31, 191, 111);
+        --red: rgb(226, 90, 102);
+
+        margin: 0;
+        padding: 1rem;
+        padding-top: 2rem;
+        background-color: var(--dark);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2rem;
+      }
+      body > button {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 3rem;
+        border-radius: 1rem;
+        border: 1px solid var(--light);
+        color: var(--light);
+        background-color: transparent;
+        font-size: 200%;
+        animation: opacity 300ms linear;
+      }
+      body > button:active {
+        opacity: 0.9;
+      }
+      body > button > .icon {
+        width: 5rem;
+        height: 5rem;
+      }
+      body > button > .loader {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 5rem;
+        height: 5rem;
+        border-radius: 5rem;
+        border: 1px solid var(--light);
+        animation: background-color 300ms linear;
+      }
+      body > button > .loader.success {
+        background-color: var(--green);
+      }
+      body > button > .loader.fail {
+        background-color: var(--red);
+      }
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      body > button > .loader.loading {
+        animation: rotate 2s linear infinite;
+        transform: rotate(360deg);
+      }
+      body > button > .loader > svg {
+        width: 4rem;
+        height: 4rem;
+        display: none;
+      }
+      body > button > .loader.default > svg.default {
+        display: block;
+      }
+      body > button > .loader.success > svg.success {
+        display: block;
+      }
+      body > button > .loader.fail > svg.fail {
+        display: block;
+      }
+      body > button > .loader.loading > svg.loading {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <button>
+      <img class="icon" src="assets/car_half.png" />
+      GARAGE
+      <div class="loader default">
+        <svg xmlns="http://www.w3.org/2000/svg" class="default" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="fail" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="cog" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </div>
+    </button>
+  </body>
+</html>
