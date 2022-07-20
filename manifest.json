@@ -1,0 +1,20 @@
+{
+  "background_color": "rgb(39, 42, 56)",
+  "categories": ["personal", "utilities"],
+  "description": "Open and close the garage door",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "assets/burrow.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ],
+  "lang": "en-AU",
+  "name": "The Burrow",
+  "orientation": "portrait",
+  "scope": "/",
+  "short_name": "Burrow",
+  "start_url": "index.html",
+  "theme_color": "rgb(39, 42, 56)"
+}
