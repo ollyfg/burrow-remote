@@ -2,22 +2,39 @@
 <html>
   <head>
     <title>Burrow Remote</title>
-    <link rel="shortcut icon" type="image/png" href="assets/burrow.png"/>
+    <link rel="shortcut icon" type="image/png" href="assets/burrow.png" />
+    <link rel="manifest" href="manifest.json">
     <style>
       body {
         --dark: rgb(39, 42, 56);
+        --header: rgb(32, 34, 46);
         --light: rgb(255, 255, 255);
         --green: rgb(31, 191, 111);
         --red: rgb(226, 90, 102);
 
         margin: 0;
-        padding: 1rem;
-        padding-top: 2rem;
+        padding: 0;
         background-color: var(--dark);
         display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 2rem;
+        font-family: "-apple-system", "Roboto", sans-serif;
+      }
+      body > header {
+        background-color: var(--header);
+        color: var(--light);
+        font-size: 300%;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-transform: uppercase;
+        padding: 2rem;
+
+        -webkit-user-select: none;  
+        -moz-user-select: none;    
+        user-select: none;
       }
       body > button {
         display: flex;
@@ -25,29 +42,39 @@
         align-items: center;
         justify-content: space-between;
         padding: 3rem;
+        margin: 4rem;
         border-radius: 1rem;
         border: 1px solid var(--light);
         color: var(--light);
         background-color: transparent;
-        font-size: 200%;
+        font-size: 300%;
         animation: opacity 300ms linear;
+
+        -webkit-user-select: none;  
+        -moz-user-select: none;    
+        user-select: none;
       }
       body > button:active {
         opacity: 0.9;
       }
       body > button > .icon {
-        width: 5rem;
-        height: 5rem;
+        width: 7rem;
+        height: 7rem;
+        transition: opacity 150ms linear;
+      }
+      body > button > .icon.loading {
+        opacity: 0.8;
       }
       body > button > .loader {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 5rem;
-        height: 5rem;
+        width: 7rem;
+        height: 7rem;
         border-radius: 5rem;
         border: 1px solid var(--light);
-        animation: background-color 300ms linear;
+        transition: background-color 150ms linear;
+        background-color: var(--dark);
       }
       body > button > .loader.success {
         background-color: var(--green);
@@ -56,8 +83,12 @@
         background-color: var(--red);
       }
       @keyframes rotate {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
       }
       body > button > .loader.loading {
         animation: rotate 2s linear infinite;
@@ -81,24 +112,395 @@
         display: block;
       }
     </style>
+    <script>
+      // -----------------------------------------------------------------------
+      // Crypto stuff
+      // -----------------------------------------------------------------------
+      const buff_to_base64 = (buff) =>
+        btoa(String.fromCharCode.apply(null, buff));
+
+      const base64_to_buf = (b64) =>
+        Uint8Array.from(atob(b64), (c) => c.charCodeAt(null));
+
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+
+      const getPasswordKey = (password) =>
+        window.crypto.subtle.importKey(
+          "raw",
+          enc.encode(password),
+          "PBKDF2",
+          false,
+          ["deriveKey"]
+        );
+
+      const deriveKey = (passwordKey, salt, keyUsage) =>
+        window.crypto.subtle.deriveKey(
+          {
+            name: "PBKDF2",
+            salt: salt,
+            iterations: 250000,
+            hash: "SHA-256",
+          },
+          passwordKey,
+          { name: "AES-GCM", length: 256 },
+          false,
+          keyUsage
+        );
+
+      async function encryptWithPassword(plaintext, password) {
+        try {
+          const salt = window.crypto.getRandomValues(new Uint8Array(16));
+          const iv = window.crypto.getRandomValues(new Uint8Array(12));
+          const passwordKey = await getPasswordKey(password);
+          const aesKey = await deriveKey(passwordKey, salt, ["encrypt"]);
+          const encryptedContent = await window.crypto.subtle.encrypt(
+            {
+              name: "AES-GCM",
+              iv: iv,
+            },
+            aesKey,
+            enc.encode(plaintext)
+          );
+
+          const encryptedContentArr = new Uint8Array(encryptedContent);
+          let buff = new Uint8Array(
+            salt.byteLength + iv.byteLength + encryptedContentArr.byteLength
+          );
+          buff.set(salt, 0);
+          buff.set(iv, salt.byteLength);
+          buff.set(encryptedContentArr, salt.byteLength + iv.byteLength);
+          const base64Buff = buff_to_base64(buff);
+          return base64Buff;
+        } catch (e) {
+          console.log(`Error - ${e}`);
+          return "";
+        }
+      }
+
+      async function decryptWithPassword(ciphertext, password) {
+        try {
+          const encryptedDataBuff = base64_to_buf(ciphertext);
+          const salt = encryptedDataBuff.slice(0, 16);
+          const iv = encryptedDataBuff.slice(16, 16 + 12);
+          const data = encryptedDataBuff.slice(16 + 12);
+          const passwordKey = await getPasswordKey(password);
+          const aesKey = await deriveKey(passwordKey, salt, ["decrypt"]);
+          const decryptedContent = await window.crypto.subtle.decrypt(
+            {
+              name: "AES-GCM",
+              iv: iv,
+            },
+            aesKey,
+            data
+          );
+          return dec.decode(decryptedContent);
+        } catch (e) {
+          console.log(`Error - ${e}`);
+          return "";
+        }
+      }
+
+      const encryptedPayload =
+        "WJaEcK5EAOwNqIucczQkFWLAPFVFko/SEOrn3pmMPYIKlnz++ep8Ew25xjgvAiiaXszHMSWl8pigNgSziSrAGRqEXwJv5vk+zY+eN+nvAa5+nRQttm4ARYTdeTxYyyVud6B5rjX0aagg+GB/1DrUnhcpnV11D2fLoh+DK9d/8PwzsWyX3GkrBJczfdSuk3OmJ0iM19wGhE7WNZrW904HwtXW7i0drfBK+A==";
+      const state = {};
+
+      async function initState(password) {
+        const { url, token, location } = JSON.parse(
+          await decryptWithPassword(encryptedPayload, password)
+        );
+        state.url = url;
+        state.token = token;
+        state.location = location;
+      }
+
+      // -----------------------------------------------------------------------
+      // Init Stuff
+      // -----------------------------------------------------------------------
+      async function askForPassword() {
+        const password = window.prompt("Please enter the password.");
+        try {
+          await initState(password);
+          // Password was correct
+          window.localStorage.setItem("password", password);
+          return password;
+        } catch (err) {
+          // Incorrect password
+          return null;
+        }
+      }
+
+      // Decrypting, Polling, etc.
+      window.addEventListener(
+        "load",
+        function () {
+          (async () => {
+            // Get the password we have stored
+            let password = window.localStorage.getItem("password");
+            if (password) {
+              await initState(password);
+            } else {
+              while (!password) {
+                password = await askForPassword();
+              }
+            }
+            // Start polling for changes
+            startPolling();
+            // const doorResult = await getGarageDoorState();
+            // setGarageDoorState(doorResult.state);
+            // Listen for button presses
+            document
+              .querySelector("button")
+              .addEventListener("click", toggleGarageDoor);
+          })();
+        },
+        false
+      );
+
+      // Caching.
+      const cacheName = "burrow-cache";
+      window.addEventListener(
+        "load",
+        function () {
+          (async () => {
+            // Cache everything
+            if ("caches" in window) {
+              const cache = await caches.open(cacheName);
+              await cache.addAll([
+                "index.html",
+                "assets/burrow.png",
+                "assets/car_closed.png",
+                "assets/car_half.png",
+                "assets/car_open.png",
+              ]);
+              console.log("Cached resources");
+            }
+          })();
+        },
+        false
+      );
+
+      function startPolling() {
+        state.polling = true;
+        poll();
+      }
+
+      function stopPolling() {
+        state.polling = false;
+      }
+
+      async function poll() {
+        if (!state.polling) {
+          return;
+        }
+        const result = await pollGarageDoorState();
+        if (result.success && result.state) {
+          setGarageDoorState(result.state);
+          poll();
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // API Calls
+      // -----------------------------------------------------------------------
+      async function toggleGarageDoor() {
+        try {
+          setLoaderState("loading");
+          const result = await fetch(state.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+              "x-my-location-trust-me": state.location,
+            },
+            body: JSON.stringify({
+              action: "OSC",
+            }),
+          });
+          const json = await result.json();
+          console.log("toggleGarageDoor", "API Result", result.status, json);
+          setLoaderState(json.success ? "success" : "fail");
+          return json;
+        } catch (error) {
+          console.error("toggleGarageDoor", "API Error", error.message, error);
+          Object.getOwnPropertyNames(error).forEach((name) => {
+            console.error("~~~*", name, error[name]);
+          });
+          setLoaderState("fail");
+          return { success: false, error };
+        } finally {
+          setTimeout(() => {
+            setLoaderState("default");
+          }, 1000);
+        }
+      }
+
+      async function getGarageDoorState() {
+        try {
+          console.log("getGarageDoorState");
+          const result = await fetch(state.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+              "x-my-location-trust-me": state.location,
+            },
+            body: JSON.stringify({
+              action: "getState",
+            }),
+          });
+          const json = await result.json();
+          console.log("getGarageDoorState", "API Result", result.status, json);
+          return json;
+        } catch (error) {
+          console.error(
+            "getGarageDoorState",
+            "API Error",
+            error.message,
+            error
+          );
+          Object.getOwnPropertyNames(error).forEach((name) => {
+            console.error("~~~*", name, error[name]);
+          });
+          return { success: false, error };
+        }
+      }
+
+      async function pollGarageDoorState() {
+        try {
+          console.log("pollGarageDoorState");
+          const result = await fetch(state.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+              "x-my-location-trust-me": state.location,
+            },
+            body: JSON.stringify({
+              action: "getState",
+              longpoll: true,
+            }),
+          });
+          const json = await result.json();
+          console.log("pollGarageDoorState", "API Result", result.status, json);
+          return json;
+        } catch (error) {
+          console.error(
+            "pollGarageDoorState",
+            "API Error",
+            error.message,
+            error
+          );
+          Object.getOwnPropertyNames(error).forEach((name) => {
+            console.error("~~~*", name, error[name]);
+          });
+          return { success: false, error };
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // UI Controls
+      // -----------------------------------------------------------------------
+
+      /** Set the garage door icon.
+       *
+       * Expect doorState to look like:
+       * ```
+       * { top: 0, bottom: 1 }
+       * ```
+       */
+      function setGarageDoorState(doorState) {
+        // Pick the icon to use
+        let icon;
+        if (doorState.top === doorState.bottom) {
+          icon = "half";
+        } else if (doorState.top && !doorState.bottom) {
+          icon = "open";
+        } else if (doorState.bottom && !doorState.top) {
+          icon = "closed";
+        }
+        // Set the icon
+        const imgTag = document.querySelector("button > img.icon");
+        imgTag.classList.remove("loading");
+        imgTag.src = `assets/car_${icon}.png`;
+      }
+
+      /** Set the state of the loader icon
+       *
+       * Expect loaderState to be:
+       * ```
+       * "default" | "loading" | "success" | "fail"
+       * ```
+       */
+      function setLoaderState(loaderState) {
+        const loaderDom = document.querySelector("button > .loader");
+        loaderDom.classList.remove("default", "loading", "success", "fail");
+        loaderDom.classList.add(loaderState);
+      }
+    </script>
   </head>
   <body>
+    <header>The Burrow</header>
     <button>
-      <img class="icon" src="assets/car_half.png" />
+      <img class="icon loading" src="assets/car_closed.png" />
       GARAGE
       <div class="loader default">
-        <svg xmlns="http://www.w3.org/2000/svg" class="default" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="default"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="1"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-        <svg xmlns="http://www.w3.org/2000/svg" class="success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="success"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="1"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
-        <svg xmlns="http://www.w3.org/2000/svg" class="fail" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="fail"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="1"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
-        <svg xmlns="http://www.w3.org/2000/svg" class="cog" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="loading"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="1"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
       </div>
     </button>
