@@ -394,7 +394,6 @@
               Authorization: `Bearer ${state.token}`,
               "x-my-location-trust-me": state.location,
             },
-            signal: AbortSignal.timeout(1000),
             body: JSON.stringify({
               action: "getState",
               longpoll: true,
