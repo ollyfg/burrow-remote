@@ -323,7 +323,7 @@
               Authorization: `Bearer ${state.token}`,
               "x-my-location-trust-me": state.location,
             },
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.timeout(5000),
             body: JSON.stringify({
               action: "OSC",
             }),
@@ -356,7 +356,7 @@
               Authorization: `Bearer ${state.token}`,
               "x-my-location-trust-me": state.location,
             },
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.timeout(5000),
             body: JSON.stringify({
               action: "getState",
             }),
@@ -420,7 +420,7 @@
               Authorization: `Bearer ${state.token}`,
               "x-my-location-trust-me": state.location,
             },
-            signal: AbortSignal.timeout(1000),
+            signal: AbortSignal.timeout(5000),
             body: JSON.stringify({
               action: "WATER_CHECKOUT",
             }),
