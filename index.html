@@ -530,7 +530,7 @@
           } else if ((new Date().getTime() / 1000) - sensorState.last_check_in > 86400) {
             displayState = "low_battery";
           } else if (sensorState.last_check_in) {
-            displayState = "DRY";
+            displayState = "dry";
           }
 
           const imagePath = `assets/water_sensor_${displayState}.png`;
