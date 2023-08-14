@@ -51,13 +51,14 @@
         gap: 2rem;
         padding-top: 2rem;
       }
-      body > section > button {
+      body > section > button, body > section > .button {
         display: flex;
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
         padding: 3rem;
-        margin: 4rem;
+        margin-left: 4rem;
+        margin-right: 4rem;
         border-radius: 1rem;
         border: 2px solid var(--light);
         color: var(--light);
@@ -72,7 +73,7 @@
       body > section > button:active {
         opacity: 0.9;
       }
-      body > section > button > .icon {
+      body > section > button > .icon, body > section > .button > .icon {
         width: 7rem;
         height: 7rem;
         transition: opacity 150ms linear;
@@ -125,6 +126,19 @@
       }
       body > section > button > .loader.loading > svg.loading {
         display: block;
+      }
+      body > section > .button.water_sensors {
+        justify-content: space-around;
+      }
+      body > section > .water_sensors > div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+      }
+      body > section > .water_sensors > div > .icon {
+        width: 7rem;
+        height: 7rem;
       }
     </style>
     <script>
@@ -283,9 +297,15 @@
         }
         // Start polling for changes
         startPolling();
-        const doorResult = await getGarageDoorState();
+        const [doorResult, waterSensorState] = await Promise.all([
+        getGarageDoorState(),
+        getWaterSensorState()
+        ]);
         if (doorResult?.state) {
           setGarageDoorState(doorResult.state);
+        }
+        if (waterSensorState?.state) {
+          setWaterSensorState(waterSensorState.state);
         }
         // Listen for button presses
         document
@@ -321,7 +341,7 @@
       // -----------------------------------------------------------------------
       async function toggleGarageDoor() {
         try {
-          setLoaderState("loading");
+          setDoorLoaderState("loading");
           const result = await fetch(state.url, {
             method: "POST",
             headers: {
@@ -336,18 +356,18 @@
           });
           const json = await result.json();
           console.log("toggleGarageDoor", "API Result", result.status, json);
-          setLoaderState(json.success ? "success" : "fail");
+          setDoorLoaderState(json.success ? "success" : "fail");
           return json;
         } catch (error) {
           console.error("toggleGarageDoor", "API Error", error.message, error);
           Object.getOwnPropertyNames(error).forEach((name) => {
             console.error("~~~*", name, error[name]);
           });
-          setLoaderState("fail");
+          setDoorLoaderState("fail");
           return { success: false, error };
         } finally {
           setTimeout(() => {
-            setLoaderState("default");
+            setDoorLoaderState("default");
           }, 1000);
         }
       }
@@ -416,6 +436,38 @@
         }
       }
 
+      async function getWaterSensorState() {
+        try {
+          console.log("getWaterSensorState");
+          const result = await fetch(state.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${state.token}`,
+              "x-my-location-trust-me": state.location,
+            },
+            signal: AbortSignal.timeout(1000),
+            body: JSON.stringify({
+              action: "WATER_CHECKOUT",
+            }),
+          });
+          const json = await result.json();
+          console.log("getWaterSensorState", "API Result", result.status, json);
+          return json;
+        } catch (error) {
+          console.error(
+            "getWaterSensorState",
+            "API Error",
+            error.message,
+            error
+          );
+          Object.getOwnPropertyNames(error).forEach((name) => {
+            console.error("~~~*", name, error[name]);
+          });
+          return { success: false, error };
+        }
+      }
+
       // -----------------------------------------------------------------------
       // UI Controls
       // -----------------------------------------------------------------------
@@ -443,17 +495,48 @@
         imgTag.src = `assets/car_${icon}.png`;
       }
 
-      /** Set the state of the loader icon
+      /** Set the state of the garage door loader icon
        *
        * Expect loaderState to be:
        * ```
        * "default" | "loading" | "success" | "fail"
        * ```
        */
-      function setLoaderState(loaderState) {
+      function setDoorLoaderState(loaderState) {
         const loaderDom = document.querySelector("button > .loader");
         loaderDom.classList.remove("default", "loading", "success", "fail");
         loaderDom.classList.add(loaderState);
+      }
+
+      /** Set the water sensor state
+       * 
+       * Expect `sensorStates` to be:
+       * ```
+       * {
+       *    ["kitchen"|"laundry"|"bathroom"]: {
+       *      last_check_in: 1691986649 // Timestamp
+       *      state: "DRY"|"WET"
+       *    }
+       * }
+       * ```
+       */
+      function setWaterSensorState(sensorStates) {
+        const locations = ["kitchen", "laundry", "bathroom"];
+        for (const location of locations) {
+          const sensorState = sensorStates[location];
+          let displayState = "loading";
+          if (sensorState.state === "WET") {
+            displayState = "wet";
+          } else if ((new Date().getTime() / 1000) - sensorState.last_check_in > 86400) {
+            displayState = "low_battery";
+          } else if (sensorState.last_check_in) {
+            displayState = "DRY";
+          }
+
+          const imagePath = `assets/water_sensor_${displayState}.png`;
+          const imageDom = document.querySelector(`.water_sensors > .${location} > img.icon`);
+          imageDom.src = imagePath;
+        }
       }
     </script>
   </head>
@@ -527,6 +610,20 @@
           </svg>
         </div>
       </button>
+      <div class="button water_sensors">
+        <div class="kitchen">
+          Kitchen
+          <img class="icon" src="assets/water_sensor_loading.png" />
+        </div>
+        <div class="laundry">
+          Laundry
+          <img class="icon" src="assets/water_sensor_loading.png" />
+        </div>
+        <div class="bathroom">
+          Bathroom
+          <img class="icon" src="assets/water_sensor_loading.png" />
+        </div>
+      </div>
     </section>
   </body>
 </html>
